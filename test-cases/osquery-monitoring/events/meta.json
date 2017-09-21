@@ -1,0 +1,5 @@
+{
+  "description": "Report event publisher health and track event counters.",
+  "interval": 86400,
+  "version": "1.5.3"
+}
