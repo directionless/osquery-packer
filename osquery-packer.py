@@ -19,9 +19,6 @@ def parse_args():
                         type=lambda x: is_valid_input_dir(parser, x),
                         help='Input Directory')
     
-    parser.add_argument('-o', dest='output', required=True,
-                        help='Output File')
-
     args = parser.parse_args()
     return args
 
@@ -55,8 +52,9 @@ def walk_input_dir(dir):
         logger.debug("Starting on directory %s" % root)
         confdb[root] = merge_json_files(root, files)
 
-        # If this is a query.sql file,
-        # Note that we found a query, and add it's contents to the confdb
+        # If this is a query.sql file, note that we found a query, and
+        # add it's contents to the confdb
+        logger.debug(files)
         for f in [f for f in files if f == "query.sql"]:
             queryname = os.path.basename(root)
             queryfile = os.path.join(root, f)
@@ -98,8 +96,8 @@ def main():
         logger.debug("Found query {0}, defined as {1}".format(name, data))
         pack_data['queries'][name] = data
 
-    #print(confdb)
-    #print(queries)
+    logger.debug(confdb)
+    logger.debug(queries)
     print(json.dumps(pack_data, #fh,
                      indent=2,
                      sort_keys=True,
