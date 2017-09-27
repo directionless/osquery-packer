@@ -18,6 +18,13 @@ def parse_args():
     parser.add_argument('-i', dest='input', required=True,
                         type=lambda x: is_valid_input_dir(parser, x),
                         help='Input Directory')
+
+    parser.add_argument('-o', dest='output', required=True,
+                            help='Output Pack File')
+
+    parser.add_argument('-r', dest='readme', required=False,
+                        help='Output Readme File (if present)')
+
     
     args = parser.parse_args()
     return args
@@ -82,7 +89,32 @@ def merger(confdb, path):
         data.update(confdb.get(c, {}))
 
     return data
-        
+
+
+def generate_readme(fh, pack_data):
+    # Vague style guidance from https://osquery.io/schema/packs/
+    # github markdown requires header rows. If we want to remove them, need html tables.
+    format_str='''
+| {name} | {description} |
+| ------ | ------ |
+| Value | {value} |
+| Query | {query} |
+| Interval | {interval} |
+| Platform | {platform} |
+
+----
+
+'''
+    for qname, qdata in pack_data['queries'].items():
+        fh.write(format_str.format(
+            name = qname,
+            description = qdata['description'],
+            query = qdata['query'],
+            interval = qdata['interval'],
+            platform = qdata.get('platform', 'all'),
+            value = qdata['value']
+        ))
+
 def main():
     args = parse_args()
     queries, confdb =  walk_input_dir(args.input)
@@ -98,10 +130,18 @@ def main():
 
     logger.debug(confdb)
     logger.debug(queries)
-    print(json.dumps(pack_data, #fh,
-                     indent=2,
-                     sort_keys=True,
-                     separators=(',', ': ')))
+
+    with open(args.output, 'w') as fh:
+        json.dump(pack_data, fh,
+                  indent=2,
+                  sort_keys=True,
+                  separators=(',', ': '))
+        fh.write("\n")
+    
+
+    if args.readme:
+        with open(args.readme, 'w') as fh:
+            generate_readme(fh, pack_data)
           
 
 logger = logging.getLogger('osquery-packer')
