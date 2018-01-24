@@ -126,6 +126,25 @@ def main():
     for name, path in queries.iteritems():
         data = merger(confdb, path)
         logger.debug("Found query {0}, defined as {1}".format(name, data))
+        # Some hacking to make differential and snapshot's easier
+        if 'interval' in data:
+            logger.error("Query {0} has de-supported `interval` option".format(name))
+            sys.exit(1)
+
+        if 'differential_interval' in data:
+            diff_data = data.copy()
+            diff_data.pop('snapshot', None)
+            diff_data.pop('snapshot_interval', None)
+            diff_data['interval'] = diff_data.pop('differential_interval')
+            pack_data['queries'][name] = diff_data.copy()
+            
+#        if 'snapshot_interval' in data:
+#            snap_data = data.copy()
+#            snap_data.pop('differential_interval', None)
+#            snap_data['interval'] = snap_data.pop('snapshot_interval')
+#            pack_data['queries'][name + '_snapshot' ] = snap_data.copy()
+        
+            
         pack_data['queries'][name] = data
 
     logger.debug(confdb)
@@ -147,6 +166,7 @@ def main():
 logger = logging.getLogger('osquery-packer')
 logging.basicConfig()
 logger.setLevel(logging.INFO)
+#logger.setLevel(logging.DEBUG)
 
 if __name__ == "__main__":
     main()
