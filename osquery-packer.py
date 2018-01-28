@@ -48,31 +48,23 @@ def merge_json_files(rootdir, files):
     return data
 
 
-# parse the input directory, and build a database of all the
-# hashses. These will be merged at a later step.
+# parse the input directory, and build a hash of all the data. These
+# will be merged at a later step.
 def walk_input_dir(dir):
     confdb = {}
-    queries = {}
     for root, dirs, files in os.walk(dir):
         logger.debug("Starting on directory %s" % root)
         confdb[root] = merge_json_files(root, files)
+        confdb[root]['name'] = os.path.basename(root)
 
         # If this is a query.sql file, note that we found a query, and
         # add it's contents to the confdb
         logger.debug(files)
         for f in [f for f in files if f == "query.sql"]:
-            queryname = os.path.basename(root)
             queryfile = os.path.join(root, f)
-            if queryname in queries:
-                logger.critical("Duplicate query name %s" % queryname)
-                sys.exit(1)
+            confdb[root]['query'] = open(queryfile).read().lstrip().rstrip()
 
-            queries[queryname] = queryfile
-            confdb[queryfile] = {
-                'query': open(queryfile).read().lstrip().rstrip()
-            }
-
-    return queries, confdb
+    return confdb
 
 
 # Given the confdb, and a path, return a dict based on merging things
@@ -96,10 +88,10 @@ def generate_readme(fh, pack_data):
     format_str = '''
 | {name} | {description} |
 | ------ | ------ |
-| Value | {value} |
 | Query | {query} |
 | Interval | {interval} |
 | Platform | {platform} |
+| Snapshot | {snapshot} |
 
 ----
 
@@ -111,25 +103,32 @@ def generate_readme(fh, pack_data):
             query=qdata['query'],
             interval=qdata['interval'],
             platform=qdata.get('platform', 'all'),
-            value=qdata['value']
+            snapshot=qdata.get('snapshot', False)
         ))
 
 
 def main():
     args = parse_args()
-    queries, confdb = walk_input_dir(args.input)
+    confdb = walk_input_dir(args.input)
 
     pack_data = {
         'queries': {},
     }
 
-    for name, path in queries.iteritems():
+    for path, confdata in confdb.items():
         data = merger(confdb, path)
-        logger.debug("Found query {0}, defined as {1}".format(name, data))
-        pack_data['queries'][name] = data
+        # with this new all-directories-are-queries thing, we get a
+        # bit overbroad in what get's pulled into pack data. In my
+        # test cases, we're now pulling in the top level dir, clearly
+        # wrong. It's not what what other things will be
+        # wrong. Likely, this will need some tweaking as more use
+        # cases appear.
+        if data['name'] == args.input:
+            continue
+        if 'query' in data:
+            pack_data['queries'][data['name']] = data
 
-    logger.debug(confdb)
-    logger.debug(queries)
+    logger.debug(json.dumps(pack_data, indent=4, sort_keys=True))
 
     with open(args.output, 'w') as fh:
         json.dump(pack_data, fh,
@@ -146,5 +145,5 @@ def main():
 if __name__ == "__main__":
     logger = logging.getLogger('osquery-packer')
     logging.basicConfig()
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.WARNING)
     main()
